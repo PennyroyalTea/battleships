@@ -86,6 +86,16 @@ async def game(websocket):
     while True:
         req = json.loads(await websocket.recv())
         my_id, msg = req['id'], json.loads(req['message'])
+
+        if 'winner_id' in msg: # game over
+            if msg['winner_id'] == my_id:
+                print('Вы победили!')
+            else:
+                print(f'Игра закончена, победил игрок {msg["winner_id"]}')
+                websocket.send(json.dumps({'type': 'update', 'subject': 'leave_game', 'content': my_id}))
+                state['step'] = 'lobby'
+            break
+
         turn, fields = msg['turn'], msg['fields']
         for i, field in enumerate(fields):
             print(f'[{i}] {"ВЫ" if my_id == i else ""}')

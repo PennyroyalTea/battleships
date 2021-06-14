@@ -44,3 +44,8 @@ def game_state(room):
         'turn': room.cur,
         'fields': list(map(lambda connection: room.connection_to_field_public[connection], room.connections))
     })
+
+def game_finish(wid):
+    return json.dumps({
+        'winner_id': wid
+    })

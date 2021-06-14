@@ -24,6 +24,7 @@ class Room:
         self.connections = []
         self.connection_to_field_private = dict()
         self.connection_to_field_public = dict()
+        self.connection_to_dead = dict()
 
     def close(self):
         self.state = 'closed'
@@ -36,6 +37,9 @@ class Room:
 
     def unsubscribe(self, ws):
         self.connections.remove(ws)
+        self.connection_to_dead.pop(ws)
+        self.connection_to_field_private.pop(ws)
+        self.connection_to_field_public.pop(ws)
         if len(self.connections) == 0:
             self.state = 'open'
 
@@ -123,6 +127,7 @@ async def consumer(message, ws):
             room = global_state['rooms'][local_state[ws]['room']]
             room.connection_to_field_private[ws] = field
             room.connection_to_field_public[ws] = [['?'] * 10 for _ in range(10)]
+            room.connection_to_dead[ws] = False
 
             if len(room.connection_to_field_private) == len(room.connections):
                 room.start_game()
@@ -141,11 +146,24 @@ async def consumer(message, ws):
             shot_pos = s_to_pair(c)
             if room.connection_to_field_private[to_connection][shot_pos[1]][shot_pos[0]] == '#': # hit!
                 room.connection_to_field_public[to_connection][shot_pos[1]][shot_pos[0]] = '#'
+                if sum([i.count('#') for i in room.connection_to_field_public[to_connection]]) == 5 + 4 + 3 + 3 + 2: # finish
+                    room.connection_to_dead[to_connection] = True
+                    if list(room.connection_to_dead.values()).count(False) == 1: # game over
+                        await multicast_with_id(game_finish(), room.connections)
+                        return
             else: # miss!
                 room.connection_to_field_public[to_connection][shot_pos[1]][shot_pos[0]] = '.'
-                room.cur = (room.cur + 1) % len(room.connections)
+                while True:
+                    room.cur = (room.cur + 1) % len(room.connections)
+                    if not room.connection_to_dead[room.connections[room.cur]]:
+                        break
             ####
             await multicast_with_id(events.game_state(room), room.connections)
+        elif message['subject'] == 'leave_game':
+            room = global_state['rooms'][local_state[ws]['room']]
+            room.unsubscribe(ws)
+            local_state[ws]['room'] = None
+
         else:
             logging.error(f'unsupported subject: {subject}')
     else:
