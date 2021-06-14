@@ -65,16 +65,30 @@ async def room_wait(websocket):
 
 
 async def room_prep(websocket):
-    print('')
-    x = await(ainput('введи че-нить'))
-    print(x)
-    # field = await battleships.read()
+    global state
+
+    field = battleships.read()
+    await websocket.send(json.dumps({'type': 'update', 'subject': 'register_field', 'content': json.dumps(field)}))
+    print(f'Поле отправлено, ждем других игроков')
+
+    while True:
+        resp = json.loads(await websocket.recv())['content']
+        if resp == 'start_game':
+            state['step'] = 'game'
+            break
+        else:
+            print(f'Получен ответ {resp}')
+
+
+async def game(websocket):
+    print('Игра началась!')
+    await asyncio.sleep(10)
 
 async def handler():
     uri = "ws://localhost:8765"
     global state
 
-    async with websockets.connect(uri) as websocket:
+    async with websockets.connect(uri, ping_interval=2, ping_timeout=2) as websocket:
         while True:
             if state['step'] == 'lobby':
                 await lobby(websocket)
@@ -82,6 +96,8 @@ async def handler():
                 await room_wait(websocket)
             elif state['step'] == 'room_prep':
                 await room_prep(websocket)
+            elif state['step'] == 'game':
+                await game(websocket)
             else:
                 raise Exception('unknown state')
 

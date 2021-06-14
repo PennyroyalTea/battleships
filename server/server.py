@@ -22,6 +22,8 @@ class Room:
         self.size = size
         self.state = 'open'
         self.connections = []
+        self.connection_to_field_private = dict()
+        self.connection_to_field_public = dict()
 
     def close(self):
         self.state = 'closed'
@@ -99,6 +101,18 @@ async def consumer(message, ws):
                 else:
                     await multicast(events.room_info(room),
                                     room.connections)
+        elif message['subject'] == 'register_field':
+            field = json.loads(message['content'])
+
+            if 'room' not in local_state[ws] or local_state[ws]['room'] is None:
+                logging.error('user not in room')
+
+            room = global_state['rooms'][local_state[ws]['room']]
+            room.connection_to_field_private[ws] = field
+            room.connection_to_field_public[ws] = [['?'] * 10 for _ in range(10)]
+
+            if len(room.connection_to_field_private) == len(room.connections):
+                await multicast(events.start_game(), room.connections)
         else:
             logging.error(f'unsupported subject: {subject}')
     else:
@@ -113,7 +127,7 @@ async def handler(websocket, path):
     finally:
         await unregister_connection(websocket)
 
-start_server = websockets.serve(handler, "localhost", 8765)
+start_server = websockets.serve(handler, "localhost", 8765, ping_timeout=None)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()
