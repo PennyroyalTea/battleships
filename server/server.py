@@ -28,6 +28,9 @@ class Room:
     def close(self):
         self.state = 'closed'
 
+    def start_game(self):
+        self.cur = 0
+
     def subscribe(self, ws):
         self.connections.append(ws)
 
@@ -60,6 +63,16 @@ async def multicast(message, connections):
         await asyncio.wait([asyncio.create_task(connection.send(message)) for connection in connections])
     print(f'multicast > {message}')
 
+async def multicast_with_id(message_obj, connections):
+    messages = [json.dumps({'id': i, 'message': message_obj}) for i, _ in enumerate(connections)]
+    if connections:
+        await asyncio.wait(
+            [asyncio.create_task(connection.send(message)) for message, connection in zip(messages, connections)]
+        )
+    print(f'multicast w id > {message_obj}')
+
+def s_to_pair(s): # 'C6' -> (2, 6)
+    return ord(s[0]) - ord('A'), int(s[1])
 
 async def consumer(message, ws):
     global global_state
@@ -112,7 +125,27 @@ async def consumer(message, ws):
             room.connection_to_field_public[ws] = [['?'] * 10 for _ in range(10)]
 
             if len(room.connection_to_field_private) == len(room.connections):
+                room.start_game()
                 await multicast(events.start_game(), room.connections)
+                await multicast_with_id(events.game_state(room), room.connections)
+        elif message['subject'] == 'shot':
+            room = global_state['rooms'][local_state[ws]['room']]
+            if ws != room.connections[room.cur]: # not your turn
+                return
+            cont = json.loads(message['content'])
+            to_id, c = int(cont['to']), cont['c']
+            if to_id == room.cur: # can't shot yourself
+                return
+            #### process shot
+            to_connection = room.connections[to_id]
+            shot_pos = s_to_pair(c)
+            if room.connection_to_field_private[to_connection][shot_pos[1]][shot_pos[0]] == '#': # hit!
+                room.connection_to_field_public[to_connection][shot_pos[1]][shot_pos[0]] = '#'
+            else: # miss!
+                room.connection_to_field_public[to_connection][shot_pos[1]][shot_pos[0]] = '.'
+                room.cur = (room.cur + 1) % len(room.connections)
+            ####
+            await multicast_with_id(events.game_state(room), room.connections)
         else:
             logging.error(f'unsupported subject: {subject}')
     else:
@@ -127,7 +160,7 @@ async def handler(websocket, path):
     finally:
         await unregister_connection(websocket)
 
-start_server = websockets.serve(handler, "localhost", 8765, ping_timeout=None)
+start_server = websockets.serve(handler, "localhost", 8765, ping_interval=None, ping_timeout=None)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()

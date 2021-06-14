@@ -38,3 +38,9 @@ def start_game():
         'code': 'ok',
         'content': 'start_game'
     })
+
+def game_state(room):
+    return json.dumps({
+        'turn': room.cur,
+        'fields': list(map(lambda connection: room.connection_to_field_public[connection], room.connections))
+    })

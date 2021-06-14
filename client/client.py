@@ -7,7 +7,8 @@ import websockets
 import battleships
 
 state = {
-    'step': 'lobby'
+    'step': 'lobby',
+    'field': None
 }
 
 
@@ -68,6 +69,7 @@ async def room_prep(websocket):
     global state
 
     field = battleships.read()
+    state['field'] = field
     await websocket.send(json.dumps({'type': 'update', 'subject': 'register_field', 'content': json.dumps(field)}))
     print(f'Поле отправлено, ждем других игроков')
 
@@ -79,10 +81,37 @@ async def room_prep(websocket):
         else:
             print(f'Получен ответ {resp}')
 
-
 async def game(websocket):
     print('Игра началась!')
-    await asyncio.sleep(10)
+    while True:
+        req = json.loads(await websocket.recv())
+        my_id, msg = req['id'], json.loads(req['message'])
+        turn, fields = msg['turn'], msg['fields']
+        for i, field in enumerate(fields):
+            print(f'[{i}] {"ВЫ" if my_id == i else ""}')
+            battleships.print_field(field)
+        print('Ваше поле:')
+        battleships.print_field(state['field'])
+        if my_id == turn:
+            while True:
+                _inp = input(f'Ваш ход! Введите через пробел номер игрока и координаты, в которые хотите выстрелить.')
+                id, c = _inp.split(' ')
+                if is_valid(id, c, my_id, fields):
+                    await websocket.send(json.dumps({
+                        'type': 'update',
+                        'subject': 'shot',
+                        'content': json.dumps({'to': id, 'c': c})
+                    }))
+                    break
+                else:
+                    print('Некорректный ввод')
+        else:
+            print(f'Ходит игрок #{turn}. Ожидайте')
+
+
+def is_valid(id, c, my_id, fields):
+    return id.isnumeric() and int(id) < len(fields) and int(id) != my_id \
+           and len(c) == 2 and ord('A') <= ord(c[0]) <= ord('J') and 0 <= int(c[1]) <= 9
 
 async def handler():
     uri = "ws://localhost:8765"
