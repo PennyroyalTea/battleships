@@ -17,11 +17,11 @@ local_state = dict()
 
 
 class Room:
-    def __init__(self, name):
+    def __init__(self, name, size):
         self.name = name
+        self.size = size
         self.state = 'open'
         self.connections = []
-        self.readycnt = 0
 
     def close(self):
         self.state = 'closed'
@@ -31,6 +31,9 @@ class Room:
 
     def unsubscribe(self, ws):
         self.connections.remove(ws)
+        if len(self.connections) == 0:
+            self.state = 'open'
+
 
 async def register_connection(websocket):
     CONNECTIONS.add(websocket)
@@ -72,7 +75,10 @@ async def consumer(message, ws):
             logging.error(f'unsupported subject: {subject}')
     elif message['type'] == 'update':                           # updates
         if message['subject'] == 'rooms':
-            global_state['rooms'].append(Room(f'{len(global_state["rooms"])}'))
+            global_state['rooms'].append(Room(
+                name = f'{len(global_state["rooms"])}',
+                size = int(message['content'])
+            ))
             await ws.send(events.response_ok())
         elif message['subject'] == 'connect_to_room':
             id = message['content']
@@ -83,17 +89,16 @@ async def consumer(message, ws):
             else:
                 global_state['rooms'][int(id)].subscribe(ws)
                 local_state[ws]['room'] = int(id)
+                room = global_state['rooms'][local_state[ws]['room']]
                 await ws.send(events.response_ok())
-                await multicast(events.room_info(global_state['rooms'][local_state[ws]['room']]),
-                                global_state['rooms'][local_state[ws]['room']].connections)
-        elif message['subject'] == 'ready':
-            if message['content'] == '+':
-                global_state['rooms'][local_state[ws]['room']].readycnt += 1
-            else:
-                global_state['rooms'][local_state[ws]['room']].readycnt -= 1
-            await multicast(
-                events.room_info(global_state['rooms'][local_state[ws]['room']]),
-                global_state['rooms'][local_state[ws]['room']].connections)
+
+                if len(room.connections) >= room.size:
+                    room.close()
+                    await multicast(events.start_game(),
+                                    room.connections)
+                else:
+                    await multicast(events.room_info(room),
+                                    room.connections)
         else:
             logging.error(f'unsupported subject: {subject}')
     else:

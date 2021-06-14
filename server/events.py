@@ -15,7 +15,7 @@ def rooms_list(global_state):
         'code': 'ok',
         'content': list(
             map(
-                lambda room: {'state': room.state, 'players': len(room.connections)},
+                lambda room: {'state': room.state, 'players': len(room.connections), 'size': room.size},
                 global_state['rooms']
             )
         )
@@ -28,6 +28,13 @@ def room_info(room):
         'content': {
             'name': room.name,
             'players': len(room.connections),
-            'ready': room.readycnt
+            'size': room.size
         }
+    })
+
+def start_game():
+    return json.dumps({
+        'type': 'response',
+        'code': 'ok',
+        'content': 'start_game'
     })

@@ -2,12 +2,12 @@ import asyncio
 from aioconsole import ainput
 import json
 import time
-
 import websockets
 
+import battleships
+
 state = {
-    'step': 'lobby',
-    'ready': False
+    'step': 'lobby'
 }
 
 
@@ -25,21 +25,22 @@ async def lobby(websocket):
         print('Доступные комнаты:')
         print('-' * 16)
         for i, room in enumerate(rooms):
-            print(f'Комната #{i}: {room["players"]} игроков, {"открыта" if room["state"] == "open" else "закрыта"}')
+            print(f'Комната #{i}: {room["players"]} / {room["size"]} игроков, {"открыта" if room["state"] == "open" else "закрыта"}')
         print('-' * 16)
 
         while True:
             resp = input('Введите номер комнаты, чтобы присоединиться к ней.\n '
-                         'Введите "new", чтобы создать новую.\n '
+                         'Введите "new [размер]", чтобы создать новую.\n '
                          'Введите "upd", чтобы обновить список комнат.')
-            if resp == 'new':
-                await websocket.send(json.dumps({'type': 'update', 'subject': 'rooms'}))
+            tokens = resp.split(' ')
+            if len(tokens) == 2 and tokens[0] == 'new' and tokens[1].isnumeric():
+                await websocket.send(json.dumps({'type': 'update', 'subject': 'rooms', 'content': tokens[1]}))
                 await websocket.recv()
                 break
-            elif resp == 'upd':
+            elif tokens[0] == 'upd':
                 break
-            elif resp.isnumeric() and int(resp) < len(rooms):
-                await websocket.send(json.dumps({'type': 'update', 'subject': 'connect_to_room', 'content': resp}))
+            elif tokens[0].isnumeric() and int(tokens[0]) < len(rooms):
+                await websocket.send(json.dumps({'type': 'update', 'subject': 'connect_to_room', 'content': tokens[0]}))
                 res = json.loads(await websocket.recv())
                 if res['code'] == 'error':
                     print(f'Ошибка при входе в комнату: {res["content"]}')
@@ -56,45 +57,18 @@ async def lobby(websocket):
 async def room_wait(websocket):
     global state
 
-
-    await websocket.send(json.dumps({'type': 'request', 'subject': 'room_info'}))
     room = json.loads(await websocket.recv())['content']
-    while True:
+    while room != 'start_game':
+        print(f'Вы в комнате {room["name"]} [{room["players"]} / {room["size"]}].')
+        room = json.loads(await websocket.recv())['content']
+    state['step'] = 'room_prep'
 
-        print(f'Вы в комнате {room["name"]} [{room["ready"]} / {room["players"]}].')
 
-        prompt = {
-            True: 'Чтобы отменить готовность, введите "unready"',
-            False: 'Чтобы подтвердить готовность, введите "ready"'
-        }
-        expected = {
-            True: 'unready',
-            False: 'ready'
-        }
-
-        console_task = asyncio.create_task(ainput(prompt[state['ready']]))
-        recv_task = asyncio.create_task(websocket.recv())
-        done, pending = await asyncio.wait(
-            [console_task, recv_task],
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-        for task in pending:
-            task.cancel()
-        if console_task in done:
-            input = console_task.result()
-            if input == expected[state['ready']]:
-                if state['ready']:
-                    state['ready'] = False
-                    await websocket.send(json.dumps({'type': 'update', 'subject': 'ready', 'content': '-'}))
-                else:
-                    state['ready'] = True
-                    await websocket.send(json.dumps({'type': 'update', 'subject': 'ready', 'content': '+'}))
-            else:
-                print(f'Некорректный ввод: {input}')
-                continue
-        else:
-            room = json.loads(recv_task.result())['content']
-
+async def room_prep(websocket):
+    print('')
+    x = await(ainput('введи че-нить'))
+    print(x)
+    # field = await battleships.read()
 
 async def handler():
     uri = "ws://localhost:8765"
@@ -106,6 +80,8 @@ async def handler():
                 await lobby(websocket)
             elif state['step'] == 'room_wait':
                 await room_wait(websocket)
+            elif state['step'] == 'room_prep':
+                await room_prep(websocket)
             else:
                 raise Exception('unknown state')
 
