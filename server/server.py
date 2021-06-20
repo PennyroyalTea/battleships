@@ -149,7 +149,7 @@ async def consumer(message, ws):
                 if sum([i.count('#') for i in room.connection_to_field_public[to_connection]]) == 5 + 4 + 3 + 3 + 2: # finish
                     room.connection_to_dead[to_connection] = True
                     if list(room.connection_to_dead.values()).count(False) == 1: # game over
-                        await multicast_with_id(game_finish(), room.connections)
+                        await multicast_with_id(events.game_finish(room.cur), room.connections)
                         return
             else: # miss!
                 room.connection_to_field_public[to_connection][shot_pos[1]][shot_pos[0]] = '.'

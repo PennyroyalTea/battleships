@@ -92,8 +92,8 @@ async def game(websocket):
                 print('Вы победили!')
             else:
                 print(f'Игра закончена, победил игрок {msg["winner_id"]}')
-                websocket.send(json.dumps({'type': 'update', 'subject': 'leave_game', 'content': my_id}))
-                state['step'] = 'lobby'
+            await websocket.send(json.dumps({'type': 'update', 'subject': 'leave_game', 'content': my_id}))
+            state['step'] = 'lobby'
             break
 
         turn, fields = msg['turn'], msg['fields']
@@ -127,7 +127,7 @@ async def handler():
     uri = "ws://localhost:8765"
     global state
 
-    async with websockets.connect(uri, ping_interval=2, ping_timeout=2) as websocket:
+    async with websockets.connect(uri, ping_interval=None, ping_timeout=None) as websocket:
         while True:
             if state['step'] == 'lobby':
                 await lobby(websocket)
