@@ -106,7 +106,7 @@ async def game(websocket):
             while True:
                 _inp = input(f'Ваш ход! Введите через пробел номер игрока и координаты, в которые хотите выстрелить.')
                 id, c = _inp.split(' ')
-                if is_valid(id, c, my_id, fields):
+                if is_valid(id, c, my_id, fields) and is_close_enough(c):
                     await websocket.send(json.dumps({
                         'type': 'update',
                         'subject': 'shot',
@@ -121,7 +121,17 @@ async def game(websocket):
 
 def is_valid(id, c, my_id, fields):
     return id.isnumeric() and int(id) < len(fields) and int(id) != my_id \
-           and len(c) == 2 and ord('A') <= ord(c[0]) <= ord('J') and 0 <= int(c[1]) <= 9
+           and len(c) == 2 and ord('A') <= ord(c[0]) <= ord('J') and c[1].isnumeric() and 0 <= int(c[1]) <= 9
+
+
+def is_close_enough(c):
+    x_shot, y_shot = battleships.s_to_pair(c)
+    for y, l in enumerate(state['field']):
+        for x, val in enumerate(l):
+            if state['field'][y][x] == '#' and abs(x - x_shot) + abs(y - y_shot) <= 2:
+                return True
+    return False
+
 
 async def handler():
     uri = "ws://localhost:8765"
