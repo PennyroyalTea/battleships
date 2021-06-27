@@ -31,7 +31,7 @@ def is_valid(field, ship, n):
     return True
 
 
-def update(field, ship):
+def update(field, ship, n):
     deltas = [(-1, 0), (0, -1), (1, 0), (0, 1)]
     coords = list(map(s_to_pair, ship))
     for (c0, c1) in coords:
@@ -41,7 +41,7 @@ def update(field, ship):
                 continue
             field[ny][nx] = 'x'
     for (c0, c1) in coords:
-        field[c1][c0] = '#'
+        field[c1][c0] = chr(ord('0') + n)
 
 
 def read():
@@ -56,7 +56,7 @@ def read():
                 f'Выберите {n} клеток в ряд, на которых будет {name}. '
             ).split(' ')
             if is_valid(field, _inp, n):
-                update(field, _inp)
+                update(field, _inp, n)
                 break
             else:
                 print(f'Некорректный ввод. Попробуйте еще раз')

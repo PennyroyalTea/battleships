@@ -85,7 +85,7 @@ def possible_shot(from_field, to_cell):
     to_x, to_y = to_cell
     for y, l in enumerate(from_field):
         for x, val in enumerate(l):
-            if val == '#' and abs(y - to_y) + abs(x - to_x) <= 2:
+            if val not in ['.', 'x'] and abs(y - to_y) + abs(x - to_x) <= int(val):
                 return True
     return False
 
@@ -193,7 +193,7 @@ async def consumer(message, ws):
         elif message['subject'] == 'room_info':
             await request_room_info(global_state, local_state, message, ws)
         else:
-            logging.error(f'unsupported subject: {subject}')
+            logging.error(f'unsupported subject: {message["subbject"]}')
     elif message['type'] == 'update':                           # updates
         if message['subject'] == 'rooms':
             await update_rooms(global_state, local_state, message, ws)
@@ -206,9 +206,9 @@ async def consumer(message, ws):
         elif message['subject'] == 'leave_game':
             await leave_game(global_state, local_state, message, ws)
         else:
-            logging.error(f'unsupported subject: {subject}')
+            logging.error(f'unsupported subject: {message["subbject"]}')
     else:
-        logging.error(f'unsupported subject: {subject}')
+        logging.error(f'unsupported subject: {message["subbject"]}')
 
 
 async def handler(websocket, path):

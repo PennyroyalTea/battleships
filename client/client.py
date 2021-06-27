@@ -128,7 +128,7 @@ def is_close_enough(c):
     x_shot, y_shot = battleships.s_to_pair(c)
     for y, l in enumerate(state['field']):
         for x, val in enumerate(l):
-            if state['field'][y][x] == '#' and abs(x - x_shot) + abs(y - y_shot) <= 2:
+            if state['field'][y][x] not in ['x', '.'] and abs(x - x_shot) + abs(y - y_shot) <= int(state['field'][y][x]):
                 return True
     return False
 
